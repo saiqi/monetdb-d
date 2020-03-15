@@ -1,0 +1,15 @@
+.dub
+docs.json
+__dummy.html
+docs/
+monetdb-d.so
+monetdb-d.dylib
+monetdb-d.dll
+monetdb-d.a
+monetdb-d.lib
+monetdb-d-test-*
+libmonetdb-*
+*.exe
+*.o
+*.obj
+*.lst

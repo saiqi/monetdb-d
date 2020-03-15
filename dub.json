@@ -1,0 +1,10 @@
+{
+	"name": "monetdb-d",
+	"authors": [
+		"saiqi"
+	],
+	"description": "A MonetDb driver based on MAPI library C binding",
+	"copyright": "Copyright © 2020, saiqi",
+	"license": "MIT",
+	"libs": ["curl", "mapi", "ssl", "crypto", "stream", "bz2", "lzma"]
+}

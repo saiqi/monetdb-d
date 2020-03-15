@@ -1,0 +1,31 @@
+language: d
+
+branches:
+  only:
+  - master
+
+d:
+  - dmd
+
+before_install:
+  - sudo apt-get install software-properties-common
+  - sudo apt-get update -q
+  - sudo sh -c "echo 'deb http://dev.monetdb.org/downloads/deb/ xenial monetdb' > /etc/apt/sources.list.d/monetdb.list"
+  - wget --output-document=- http://dev.monetdb.org/downloads/MonetDB-GPG-KEY | sudo apt-key add -
+  - sudo apt-get update -q
+  - sudo apt-get install -qy monetdb5-sql monetdb-client libclang-3.9-dev libclang1-3.9 libmonetdb-client-dev libmonetdb-stream-dev libbz2-dev liblzma-dev
+  - sudo mkdir -p -m 770 /var/lib/monetdb
+  - sudo chown -R monetdb.monetdb /var/lib/monetdb
+  - sudo -u monetdb monetdbd create /var/lib/monetdb
+  - sudo -u monetdb monetdbd start /var/lib/monetdb
+  - sudo -u monetdb monetdbd set control=yes /var/lib/monetdb
+  - sudo -u monetdb monetdbd set passphrase=testdb /var/lib/monetdb
+  - sudo -u monetdb monetdb create 16megabytes
+  - sudo -u monetdb monetdb set embedpy=true 16megabytes
+  - sudo -u monetdb monetdb release 16megabytes
+
+script:
+  - dub test -b unittest-cov --compiler=${DC}
+
+after_success:
+  - bash <(curl -s https://codecov.io/bash)
