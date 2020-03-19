@@ -14,131 +14,168 @@ alias Null = typeof(null);
 //TODO: support const type as well
 alias Record = Algebraic!(int, short, long, double, char, bool, string, Date, DateTime, Null);
 
-class MonetDbException : Exception {
-    this(string msg, string file = __FILE__, size_t line = __LINE__) {
+class MonetDbException : Exception
+{
+    this(string msg, string file = __FILE__, size_t line = __LINE__)
+    {
         super(msg, file, line);
     }
 }
 
-protected Record dize(T)(const T typeName, const T value)
-if (is(T : string)) {
+protected Record dize(T)(const T typeName, const T value) if (is(T : string))
+{
     Record res;
-    if(value == "") {
+    if (value == "")
+    {
         res = null;
         return res;
     }
-    if(typeName == "int") {
+    if (typeName == "int")
+    {
         res = value.to!int;
-    } else if (typeName == "tinyint") {
+    }
+    else if (typeName == "tinyint")
+    {
         res = value.to!short;
-    } else if (typeName == "bigint") {
+    }
+    else if (typeName == "bigint")
+    {
         res = value.to!long;
-    } else if(typeName == "double") {
+    }
+    else if (typeName == "double")
+    {
         res = value.to!double;
-    } else if (typeName == "date") {
+    }
+    else if (typeName == "date")
+    {
         res = Date.fromISOExtString(value.to!string);
-    } else if (typeName == "timestamp") {
+    }
+    else if (typeName == "timestamp")
+    {
         auto toExtISOFormat = (const string d) => d[0 .. 10] ~ "T" ~ d[11 .. 19];
         res = DateTime.fromISOExtString(toExtISOFormat(value.to!string));
-    } else if (typeName == "varchar" || typeName == "char") {
+    }
+    else if (typeName == "varchar" || typeName == "char")
+    {
         res = value.to!string;
-    } else {
+    }
+    else
+    {
         enforce!MonetDbException(false, "Could not d-ize type: " ~ typeName);
     }
     return res;
 }
 
-protected MapiDate monetizeDate(const Date date) {
+protected MapiDate monetizeDate(const Date date)
+{
     return MapiDate(date.year, date.month, date.day);
 }
 
-protected MapiDateTime monetizeDateTime(const DateTime date) {
-    return MapiDateTime(
-        date.year, date.month, date.day, date.hour, date.minute, date.second, 0);
+protected MapiDateTime monetizeDateTime(const DateTime date)
+{
+    return MapiDateTime(date.year, date.month, date.day, date.hour, date.minute, date.second, 0);
 }
 
-Record[] recordArray(T...)(T params) {
+Record[] recordArray(T...)(T params)
+{
     Record[] records;
-    foreach(i, p; params) {
+    foreach (i, p; params)
+    {
         records ~= Record(p);
     }
     return records;
 }
 
-class MonetDb {
+class MonetDb
+{
     private Mapi _mapi;
 
-    this(string host, int port, string username, string password, string lang, string dbname) @trusted {
-        _mapi = mapi_connect(
-            toStringz(host),
-            port,
-            toStringz(username),
-            toStringz(password),
-            toStringz(lang),
-            toStringz(dbname));
+    this(string host, int port, string username, string password, string lang, string dbname) @trusted
+    {
+        _mapi = mapi_connect(toStringz(host), port, toStringz(username),
+                toStringz(password), toStringz(lang), toStringz(dbname));
     }
 
-    ~this() {
+    ~this()
+    {
         mapi_destroy(_mapi);
     }
 
-    private string errorMessage(MapiHdl handler) {
+    private string errorMessage(MapiHdl handler)
+    {
         auto msg = mapi_error_str(_mapi);
-        if(msg) {
+        if (msg)
+        {
             return to!string(msg);
         }
         return to!string(mapi_result_error(handler));
     }
 
-    private int getMapiType(Record p) {
-        return p.visit!(
-            (int a) => MAPI_INT,
-            (short a) => MAPI_SHORT,
-            (long a) => MAPI_LONG,
-            (char a) => MAPI_CHAR,
-            (string a) => MAPI_VARCHAR,
-            (double a) => MAPI_DOUBLE,
-            (Date a) => MAPI_DATE,
-            (DateTime a) => MAPI_DATETIME,
-            (bool a) => MAPI_USHORT,
-            (Null a) => -1
-        )();
+    private int getMapiType(Record p)
+    {
+        return p.visit!((int a) => MAPI_INT, (short a) => MAPI_SHORT,
+                (long a) => MAPI_LONG, (char a) => MAPI_CHAR, (string a) => MAPI_VARCHAR,
+                (double a) => MAPI_DOUBLE, (Date a) => MAPI_DATE,
+                (DateTime a) => MAPI_DATETIME, (bool a) => MAPI_USHORT, (Null a) => -1)();
     }
 
-    private MapiHdl buildHandler(string command, Record[] params) {
+    private MapiHdl buildHandler(string command, Record[] params)
+    {
         MapiHdl result;
-        if (params is null) {
+        if (params is null)
+        {
             result = mapi_query(_mapi, toStringz(command));
-        } else {
+        }
+        else
+        {
             result = mapi_prepare(_mapi, toStringz(command));
-            foreach(i, p; params) {
+            foreach (i, p; params)
+            {
                 auto mapiType = getMapiType(p);
-                enforce!MonetDbException(mapiType >= 0, "Parameter having a null value are not supported!");
-                if(p.type == typeid(Date)) {
+                enforce!MonetDbException(mapiType >= 0,
+                        "Parameter having a null value are not supported!");
+                if (p.type == typeid(Date))
+                {
                     auto d = p.get!Date.monetizeDate;
                     mapi_param_type(result, i.to!int, mapiType, mapiType, &d);
-                } else if (p.type == typeid(DateTime)) {
+                }
+                else if (p.type == typeid(DateTime))
+                {
                     auto d = p.get!DateTime.monetizeDateTime;
                     mapi_param_type(result, i.to!int, mapiType, mapiType, &d);
-                } else if (p.type == typeid(string)) {
-                    auto s = cast(char*)p.get!string.toStringz;
+                }
+                else if (p.type == typeid(string))
+                {
+                    auto s = cast(char*) p.get!string.toStringz;
                     mapi_param_type(result, i.to!int, mapiType, mapiType, s);
-                } else if (p.type == typeid(int)) {
+                }
+                else if (p.type == typeid(int))
+                {
                     auto v = p.get!int;
                     mapi_param_type(result, i.to!int, mapiType, mapiType, &v);
-                } else if (p.type == typeid(long)) {
+                }
+                else if (p.type == typeid(long))
+                {
                     auto v = p.get!long;
                     mapi_param_type(result, i.to!int, mapiType, mapiType, &v);
-                } else if (p.type == typeid(double)) {
+                }
+                else if (p.type == typeid(double))
+                {
                     auto v = p.get!double;
                     mapi_param_type(result, i.to!int, mapiType, mapiType, &v);
-                } else if (p.type == typeid(char)) {
+                }
+                else if (p.type == typeid(char))
+                {
                     auto v = p.get!char;
                     mapi_param_type(result, i.to!int, mapiType, mapiType, &v);
-                } else if (p.type == typeid(bool)) {
+                }
+                else if (p.type == typeid(bool))
+                {
                     auto v = p.get!bool;
                     mapi_param_type(result, i.to!int, mapiType, mapiType, &v);
-                } else {
+                }
+                else
+                {
                     assert(false);
                 }
             }
@@ -149,38 +186,46 @@ class MonetDb {
         return result;
     }
 
-    void exec(string command, Record[] params = null) {
+    void exec(string command, Record[] params = null)
+    {
         auto result = buildHandler(command, params);
         mapi_close_handle(result);
     }
 
-    auto query(string command, Record[] params = null) {
+    auto query(string command, Record[] params = null)
+    {
         auto result = buildHandler(command, params);
 
-        static struct QueryResult {
+        static struct QueryResult
+        {
             private MapiHdl handler_;
             private bool hasRow_;
             private int count_;
 
-            this(MapiHdl handler) {
+            this(MapiHdl handler)
+            {
                 handler_ = handler;
                 fetchRow();
             }
 
-            auto empty() {
+            auto empty()
+            {
                 return !hasRow_;
             }
 
-            private void fetchRow() {
-                hasRow_ = mapi_fetch_row(handler_) == 0 ? false : true;
+            private void fetchRow()
+            {
+                hasRow_ = mapi_fetch_row(handler_) != 0;
                 count_ = mapi_get_field_count(handler_);
             }
 
-            auto front() {
+            auto front()
+            {
                 assert(!empty);
 
                 Record[string] records;
-                foreach(i; iota(count_)) {
+                foreach (i; iota(count_))
+                {
                     auto name = mapi_get_name(handler_, i).to!string;
                     auto typeName = mapi_get_type(handler_, i).to!string;
                     auto value = mapi_fetch_field(handler_, i).to!string;
@@ -189,28 +234,32 @@ class MonetDb {
                 return records;
             }
 
-            void popFront() {
+            void popFront()
+            {
                 assert(!empty);
                 fetchRow();
-                if(!hasRow_) mapi_close_handle(handler_);
+                if (!hasRow_)
+                    mapi_close_handle(handler_);
             }
         }
 
         return QueryResult(result);
     }
 
-    void close() {
+    void close()
+    {
         mapi_disconnect(_mapi);
     }
 }
 
-unittest {
+unittest
+{
     auto conn = new MonetDb("localhost", 50_000, "monetdb", "monetdb", "sql", "16megabytes");
-    scope(exit) conn.close();
+    scope (exit)
+        conn.close();
 
     conn.exec("DROP TABLE IF EXISTS FOO;");
-    conn.exec(
-        `CREATE TABLE IF NOT EXISTS FOO (
+    conn.exec(`CREATE TABLE IF NOT EXISTS FOO (
             ID INTEGER NOT NULL,
             VALUE VARCHAR(5),
             RATIO DOUBLE,
@@ -244,23 +293,26 @@ unittest {
     assert(row3["ratio"].get!Null is null);
 
     Record[] params = recordArray(1, "foo");
-    auto rp = conn.query("SELECT ID, VALUE, RATIO, CREATION FROM FOO WHERE ID = ? AND VALUE = ?", params);
+    auto rp = conn.query(
+            "SELECT ID, VALUE, RATIO, CREATION FROM FOO WHERE ID = ? AND VALUE = ?", params);
     assert(rp.front["id"].get!int == 1);
     assert(rp.front["value"].get!string == "foo");
     assert(rp.front["ratio"].get!double == .5);
     assert(rp.front["creation"].get!Date == Date(2018, 1, 1));
 
-    auto rl = conn.query(
-        "SELECT COUNT(*) AS V, ID FROM FOO WHERE FLAG = ? AND SYSDATE > ? AND UNIT = ? GROUP BY ID HAVING COUNT(*) = ?;",
-        recordArray(false, DateTime(1970, 1, 1, 0, 0, 0), 'U', 1L));
+    auto rl = conn.query("SELECT COUNT(*) AS V, ID FROM FOO WHERE FLAG = ? AND SYSDATE > ? AND UNIT = ? GROUP BY ID HAVING COUNT(*) = ?;",
+            recordArray(false, DateTime(1970, 1, 1, 0, 0, 0), 'U', 1L));
     assert(rl.front["v"].get!long == 1L);
 
     conn.exec("DROP TABLE FOO;");
 }
 
-unittest {
+unittest
+{
     auto conn = new MonetDb("localhost", 50_000, "monetdb", "monetdb", "sql", "16megabytes");
-    scope(exit) conn.close();
+    scope (exit)
+        conn.close();
 
-    conn.exec("CREATE TABLE IF NOT EXISTS FOO (ID INT); INSERT INTO FOO (ID) VALUES (1), (2); DROP TABLE FOO;");
+    conn.exec(
+            "CREATE TABLE IF NOT EXISTS FOO (ID INT); INSERT INTO FOO (ID) VALUES (1), (2); DROP TABLE FOO;");
 }
